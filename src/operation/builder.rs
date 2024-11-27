@@ -16,15 +16,13 @@ impl Builder {
             operator: Operator::None,
         }
     }
-    pub fn set_left(&mut self, left: Box<dyn Operation>) -> &Self {
-        self.left = Some(left);
-        self
-    }
-    pub fn set_right(&mut self, right: Box<dyn Operation>) -> &Self {
-        self.right = Some(right);
-        self
-    }
-    pub fn operator(&mut self, operator: Operator) -> &Self {
+
+    pub fn set_operator(&mut self, operator: Operator) -> &Self {
+        if self.right.is_some() {
+            if self.operator.priority() > operator.priority() {
+                let op = Self::make(self.left.unwrap(), self.operator, self.right.unwrap());
+            }
+        }
         self.operator = operator;
         self
     }
@@ -37,25 +35,6 @@ impl Builder {
         } else {
             panic!("Both left and right are already set");
         }
-        self
-    }
-
-    pub fn from_str<'a>(&mut self, token: &'a str) -> &Self {
-        if Operator::is_operator(token) {
-            self.operator(Operator::from_str(token));
-        } else {
-            let val_r = token.parse::<f64>();
-            if val_r.is_err() {
-                panic!("Invalid token: {}", token);
-            }
-
-            let val = val_r.unwrap();
-
-            let boxed = Box::new(val);
-
-            self.next(boxed);
-        }
-
         self
     }
 
@@ -76,7 +55,15 @@ impl Builder {
 
         let right = self.right.unwrap();
 
-        match self.operator {
+        Self::make(left, self.operator, right)
+    }
+
+    pub fn make(
+        left: Box<dyn Operation>,
+        op: Operator,
+        right: Box<dyn Operation>,
+    ) -> Box<dyn Operation> {
+        match op {
             Operator::Add => Box::new(Add::new(left, right)),
             Operator::Sub => Box::new(Sub::new(left, right)),
             Operator::Mul => Box::new(Mul::new(left, right)),

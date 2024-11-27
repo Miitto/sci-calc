@@ -1,3 +1,4 @@
+#[derive(Debug, Copy, PartialEq, Clone)]
 pub enum Operator {
     None,
     Add,
@@ -24,14 +25,14 @@ impl Operator {
         }
     }
 
-    pub fn from_str(c: &str) -> Self {
-        match c {
+    pub fn from_str(c: &str) -> Result<Self, ()> {
+        Ok(match c {
             "+" => Operator::Add,
             "-" => Operator::Sub,
             "*" => Operator::Mul,
             "/" => Operator::Div,
-            _ => Operator::None,
-        }
+            _ => return Err(()),
+        })
     }
 
     pub fn priority(&self) -> i32 {
@@ -39,18 +40,6 @@ impl Operator {
             Operator::Add | Operator::Sub => 1,
             Operator::Mul | Operator::Div => 2,
             _ => 0,
-        }
-    }
-}
-
-impl PartialEq for Operator {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Operator::Add, Operator::Add)
-            | (Operator::Sub, Operator::Sub)
-            | (Operator::Mul, Operator::Mul)
-            | (Operator::Div, Operator::Div) => true,
-            _ => false,
         }
     }
 }

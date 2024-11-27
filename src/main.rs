@@ -1,6 +1,9 @@
 use operation::{Builder, Operation};
+use operator::Operator;
 mod operation;
 mod operator;
+mod token;
+use token::Token;
 
 fn main() {
     println!("Enter Expression: ");
@@ -10,20 +13,24 @@ fn main() {
 
     std::io::stdin().read_line(&mut input).unwrap();
 
-    let tokens = tokenize(&input);
+    let mut tokens = tokenize(&input);
 
-    let op = parse(&tokens, None);
+    let mut iter = tokens.iter_mut();
+
+    let op = parse(&mut iter, None);
 
     let res = op.evaluate();
 
     println!("Result: {}", res);
 }
 
-type Token = String;
 type Tokens = Vec<Token>;
 type TokensSlice = [Token];
 
-fn parse(tokens: &TokensSlice, builder: Option<Builder>) -> Box<dyn Operation> {
+fn parse<'a, T>(tokens: &mut T, builder: Option<Builder>) -> Box<dyn Operation>
+where
+    T: Iterator<Item = &'a mut Token>,
+{
     if builder.is_none() {
         let builder = Builder::new();
         return parse(tokens, Some(builder));
@@ -31,29 +38,27 @@ fn parse(tokens: &TokensSlice, builder: Option<Builder>) -> Box<dyn Operation> {
 
     let mut builder = builder.unwrap();
 
-    if tokens.is_empty() {
-        return builder.build();
-    }
-
-    let mut iter = tokens.iter().enumerate();
-
-    while let Some((idx, token)) = iter.next() {
-        if *token == '('.to_string() {
+    while let Some(token) = tokens.next() {
+        if token.is_open_parenthesis() {
             let mut depth = 1;
-            while let Some((inner, token)) = iter.next() {
-                if *token == '('.to_string() {
+            while let Some(token) = tokens.next() {
+                if token.is_open_parenthesis() {
                     depth += 1;
                 }
-                if *token == ')'.to_string() {
+                if token.is_close_parentesis() {
                     depth -= 1;
                 }
                 if depth == 0 {
-                    let inner = &tokens[idx + 1..idx + inner];
-                    let operation = parse(inner, None);
+                    let operation = parse(tokens, None);
                     builder.next(operation);
                     break;
                 }
             }
+        }
+
+        if let Token::Operator(op) = token {
+            builder.operator(*op);
+            continue;
         }
     }
 
@@ -68,7 +73,9 @@ fn tokenize(input: &str) -> Tokens {
     macro_rules! push_token {
         () => {
             if !token.is_empty() {
-                tokens.push(token.clone());
+                let num = token.parse::<f64>().unwrap();
+                let boxed = Box::new(num);
+                tokens.push(Token::Operation(boxed));
                 token.clear();
             }
         };
@@ -87,16 +94,17 @@ fn tokenize(input: &str) -> Tokens {
 
         if c == '(' || c == ')' {
             push_token!();
-            tokens.push(c.to_string());
-            push_token!();
+            match c {
+                '(' => tokens.push(Token::OpenParenthhesis),
+                ')' => tokens.push(Token::CloseParenthesis),
+                _ => {}
+            }
             continue;
         }
 
-        if operator::Operator::is_operator(&c) {
+        if let Ok(op) = operator::Operator::from_str(&c.to_string()) {
             push_token!();
-            tokens.push(c.to_string());
-            push_token!();
-            continue;
+            tokens.push(Token::Operator(op));
         }
     }
 
